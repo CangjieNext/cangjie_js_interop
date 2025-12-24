@@ -7,6 +7,7 @@
 package js_interop
 
 import std.sync.AtomicInt32
+import std.sync.AtomicBool
 
 type uv_thread_t = UIntNative
 
@@ -39,12 +40,17 @@ foreign {
     func uv_stop(loop: uv_loop): Unit
     func uv_async_init(loop: uv_loop, async: uv_async, callback: CFunc<(uv_async) -> Unit>): Int32
     func uv_async_send(async: uv_async): Int32
+    func uv_close(async: uv_async, callback: CFunc<(uv_async) -> Unit>): Unit
+    func uv_walk(loop: uv_loop, callback: CFunc<(uv_async, CPointer<Unit>) -> Unit>, data: CPointer<Unit>): Unit
+    func uv_is_closing(async: uv_async): Int32
 }
 
 @C
 func uvLoopRunStub(id: Int64): Unit {
     if (let Some(loop) <- UvLoop.allLoops_.get(id)) {
-        loop.onStart()
+        if (!loop.destroyed.load()) {
+            loop.onStart()
+        }
     }
 }
 
@@ -61,6 +67,8 @@ func uvLoopAsyncStub(async: uv_async): Unit {
 class UvLoop {
     static var allLoops_ = SlabMT<UvLoop>()
 
+    public var destroyed = AtomicBool(false)
+
     static func newLoop(): UvLoop {
         let loop = UvLoop()
         let index = allLoops_.append(loop)
@@ -71,7 +79,6 @@ class UvLoop {
             throw Exception("create uv_thread failed: ${status}")
         }
         while (loop.runStatus_.load() == 0) {
-            // wait init end
         }
         return loop
     }
@@ -116,7 +123,24 @@ class UvLoop {
         if (tid_ == currentTid) {
             throw Exception("can't stop uv loop on it's running thread")
         }
+
+        postTask {
+            unsafe {
+                uv_walk(loop_, {
+                    handler, arg => if (uv_is_closing(handler) == 0) {
+                        uv_close(handler) {
+                            handler => ()
+                        }
+                    }
+                }, CPointer<Unit>())
+                destroyed.store(true)
+            }
+        }
+
         unsafe {
+            uv_close(async_) {
+                item => ()
+            }
             uv_stop(loop_)
             var tid = tid_
             uv_thread_join(inout tid)
@@ -153,13 +177,12 @@ class UvLoop {
     }
 
     func onAsync(): Unit {
-        if (runStatus_.compareAndSwap(2, 3)) {
-            return
-        }
-        let tasks = pendingTasks_.getAllAndClear()
         asyncStatus_.store(0)
+        let tasks = pendingTasks_.getAllAndClear()
         for (task in tasks) {
-            task()
+            if (!this.destroyed.load()) {
+                task()
+            }
         }
     }
 

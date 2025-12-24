@@ -119,10 +119,20 @@ public class JSScriptBuilder {
         unsafe {
             let rawArr = options_.getRawArray()
             let handle = acquireArrayRawData(rawArr)
-            let result = callback(options_.size, handle.pointer)
-            releaseArrayRawData(handle)
-            clear()
-            return result
+            try {
+                let result = callback(options_.size, handle.pointer)
+                releaseArrayRawData(handle)
+                clear()
+                return result
+            } catch (e: Exception) {
+                clear()
+                releaseArrayRawData(handle)
+                throw e
+            } catch (e: Error) {
+                clear()
+                releaseArrayRawData(handle)
+                throw e
+            }
         }
     }
 
