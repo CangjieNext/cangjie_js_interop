@@ -11,6 +11,10 @@ public class JSString <: JSHeapObject & JSKeyable & FromJSValue<JSString> & ToSt
         super(context, value)
     }
 
+    ~init() {
+        context_.releaseRef(ref_)
+    }
+
     public static func isCurrentType(_: JSContext, value: JSValue): Bool {
         return value.isString()
     }
@@ -26,9 +30,18 @@ public class JSString <: JSHeapObject & JSKeyable & FromJSValue<JSString> & ToSt
             size++  // Increase one because the null terminator is excluded.
             let buffer = Array<UInt8>(size, repeat: 0)
             let handle = acquireArrayRawData(buffer)
-            JSRuntime.check(OH_JSVM_GetValueStringUtf8(context_.env, innerValue, handle.pointer, size, inout size))
-            releaseArrayRawData(handle)
-            return String.fromUtf8Unchecked(buffer[..size])  // Remove the null terminator.
+            try {
+                JSRuntime.check(OH_JSVM_GetValueStringUtf8(context_.env, innerValue, handle.pointer, size, inout size))
+                releaseArrayRawData(handle)
+                return String.fromUtf8Unchecked(buffer[..size])  // Remove the null terminator.
+            } catch (e: Exception) {
+                releaseArrayRawData(handle)
+                throw e
+            } catch (e: Error) {
+                releaseArrayRawData(handle)
+                throw e
+            }
+
         }
     }
 }

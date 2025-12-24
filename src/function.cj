@@ -20,8 +20,16 @@ public struct JSCallInfo {
         var lambdaId: Int64 = 0
         unsafe {
             let handle = acquireArrayRawData(argPreserve)
-            OH_JSVM_GetCbInfo(context.env, cbInfo, inout argC, handle.pointer, inout thisArg, inout lambdaId)
-            releaseArrayRawData(handle)
+            try {
+                JSRuntime.check(OH_JSVM_GetCbInfo(context.env, cbInfo, inout argC, handle.pointer, inout thisArg, inout lambdaId))
+                releaseArrayRawData(handle)
+            } catch (e: Exception) {
+                releaseArrayRawData(handle)
+                throw e
+            } catch (e: Error) {
+                releaseArrayRawData(handle)
+                throw e
+            }
         }
         let imutableArgs = argPreserve
         let args = Array<JSValue>(argC) {
@@ -123,11 +131,19 @@ public class JSFunction <: JSHeapObject & FromJSValue<JSFunction> {
         unsafe {
             let handle = acquireArrayRawData(name.rawData())
             var result = JSVM_Value()
-            var callback = LibC.malloc<JSVM_Callback>()
-            callback.write(cb)
-            JSRuntime.check(OH_JSVM_CreateFunction(context.env, handle.pointer, handle.array.size, callback, inout result))
-            JSRuntime.check(OH_JSVM_AddFinalizer(context.env, result, CPointer<Unit>(callback), jsFunctionFinalizerStub, lambdaId, CPointer<JSVM_Ref>()))
-            releaseArrayRawData(handle)
+            try {
+                var callback = LibC.malloc<JSVM_Callback>()
+                callback.write(cb)
+                JSRuntime.check(OH_JSVM_CreateFunction(context.env, handle.pointer, handle.array.size, callback, inout result))
+                JSRuntime.check(OH_JSVM_AddFinalizer(context.env, result, CPointer<Unit>(callback), jsFunctionFinalizerStub, lambdaId, CPointer<JSVM_Ref>()))
+                releaseArrayRawData(handle)
+            } catch (e: Exception) {
+                releaseArrayRawData(handle)
+                throw e
+            } catch (e: Error) {
+                releaseArrayRawData(handle)
+                throw e
+            }
             return JSFunction(context, JSValue(context, result))
         }
     }
@@ -150,8 +166,16 @@ public class JSFunction <: JSHeapObject & FromJSValue<JSFunction> {
                 JSRuntime.checkAndHandleError(context_, OH_JSVM_CallFunction(context_.env, thisArg, toJSValue().value_, 0, CPointer<JSVM_Value>(), inout result))
             } else {
                 let handle = acquireArrayRawData(args)
-                JSRuntime.checkAndHandleError(context_, OH_JSVM_CallFunction(context_.env, thisArg, toJSValue().value_, args.size, handle.pointer, inout result))
-                releaseArrayRawData(handle)
+                try {
+                    JSRuntime.checkAndHandleError(context_, OH_JSVM_CallFunction(context_.env, thisArg, toJSValue().value_, args.size, handle.pointer, inout result))
+                    releaseArrayRawData(handle)
+                } catch (e: Exception) {
+                    releaseArrayRawData(handle)
+                    throw e
+                } catch (e: Error) {
+                    releaseArrayRawData(handle)
+                    throw e
+                }
             }
 
             return result
