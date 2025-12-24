@@ -4,7 +4,8 @@
 package ohos_app_cangjie_entry.js_interop
 
 import std.sync.ReentrantMutex
-import std.sync.SyncCounter
+import std.sync.AtomicInt64
+import std.sync.AtomicBool
 
 class Once<T> {
     private let mutex_ = ReentrantMutex()
@@ -40,7 +41,8 @@ public class JSRuntime {
     private var mainContext_: ?JSContext = None
     private var uvLoop_: UvLoop
     private var scope_: JSVM_VMScope
-    private var destroyed: Bool
+    private var destroyed: AtomicBool = AtomicBool(false)
+    let contextCreatedLock = AtomicBool(false)
 
     private static let JSVMGlobalInitTask = Once {
         var options = JSVM_InitOptions()
@@ -53,12 +55,13 @@ public class JSRuntime {
         JSVMGlobalInitTask.execute()
         let uvLoop = UvLoop.newLoop()
         let result = Box<?JSRuntime>(None)
-        let counter = SyncCounter(1)
+        let counter = AtomicInt64(1)
         uvLoop.postTask {
             result.value = JSRuntime(uvLoop)
-            counter.dec()
+            counter.store(0)
         }
-        counter.waitUntilZero()
+        while (counter.load() != 0) {
+        }
         return result.value.getOrThrow()
     }
 
@@ -74,31 +77,60 @@ public class JSRuntime {
         }
         vm_ = vm
         scope_ = scope
-
-        destroyed = false
     }
 
     ~init() {
-        if (destroyed) { return }
-        unsafe {
-            check(OH_JSVM_CloseVMScope(vm_, scope_))
-            check(OH_JSVM_DestroyVM(vm_))
+        if (!destroyed.compareAndSwap(false, true)) {
+            return
         }
+
+        let counter = AtomicInt64(1)
+        uvLoop_.postTask {
+            unsafe {
+                if (let Some(context) <- mainContext_) {
+                    check(OH_JSVM_DestroyEnv(context.env))
+                }
+                check(OH_JSVM_CloseVMScope(vm_, scope_))
+                check(OH_JSVM_DestroyVM(vm_))
+            }
+            if (let Some(context) <- mainContext_) {
+                context.destroyed = true
+            }
+            counter.store(0)
+        }
+        while (counter.load() != 0) {
+        }
+
         uvLoop_.stop()
     }
 
     public func destroy(): Unit {
-        if (destroyed) { return }
-        unsafe {
-            check(OH_JSVM_CloseVMScope(vm_, scope_))
-            check(OH_JSVM_DestroyVM(vm_))
+        if (!destroyed.compareAndSwap(false, true)) {
+            return
+        }
+
+        let counter = AtomicInt64(1)
+        uvLoop_.postTask {
+            unsafe {
+                if (let Some(context) <- mainContext_) {
+                    check(OH_JSVM_DestroyEnv(context.env))
+                }
+                check(OH_JSVM_CloseVMScope(vm_, scope_))
+                check(OH_JSVM_DestroyVM(vm_))
+            }
+
+            if (let Some(context) <- mainContext_) {
+                context.destroyed = true
+            }
+            counter.store(0)
+        }
+        while (counter.load() != 0) {
         }
         uvLoop_.stop()
-        destroyed = true
     }
 
     public func isDestroyed(): Bool {
-        return destroyed
+        return destroyed.load()
     }
 
     // This will be replaced by `checkAndHandleError`.
@@ -112,11 +144,9 @@ public class JSRuntime {
         if (!status.isOk()) {
             unsafe {
                 var isPending = false
-                if (OH_JSVM_IsExceptionPending(context.env, inout isPending).isOk() && isPending)
-                {
+                if (OH_JSVM_IsExceptionPending(context.env, inout isPending).isOk() && isPending) {
                     var error = JSVM_Value()
-                    if (OH_JSVM_GetAndClearLastException(context.env, inout error).isOk())
-                    {
+                    if (OH_JSVM_GetAndClearLastException(context.env, inout error).isOk()) {
                         // 获取异常堆栈
                         var stack = JSVM_Value()
                         let stackStr = LibC.mallocCString("stack")
@@ -137,7 +167,15 @@ public class JSRuntime {
             if (let Some(context) <- mainContext_) {
                 context
             } else {
-                createContext()
+                uvLoop_.postTask {
+                    if (!contextCreatedLock.load()) {
+                        createContext()
+                        contextCreatedLock.store(true)
+                    }
+                }
+                while (!contextCreatedLock.load()) {
+                }
+                return mainContext_.getOrThrow()
             }
         }
     }

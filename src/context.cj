@@ -5,11 +5,13 @@ package ohos_app_cangjie_entry.js_interop
 
 import ohos.file_fs.*
 import std.collection.*
-import std.sync.SyncCounter
+import std.sync.AtomicInt64
+
 
 public class JSContext {
     private static let allContext_ = HashMap<UIntNative, JSContext>()
     private static var mutex_ = AtomicLock()
+    var destroyed = false
 
     JSContext(
         private let env_: JSVM_Env,
@@ -21,6 +23,9 @@ public class JSContext {
     prop env: JSVM_Env {
         get() {
             // checkScope()
+            if (destroyed) {
+                throw Exception("Contex has been destroyed!")
+            }
             env_
         }
     }
@@ -60,6 +65,9 @@ public class JSContext {
     func doAsyncTask(): Unit {
         let callbacks = asyncCallbacks_.getAllAndClear()
         for (callback in callbacks) {
+            if (this.destroyed) {
+                return
+            }
             callback()
         }
         let refs = refsMutex_.acquire {
@@ -136,22 +144,23 @@ public class JSContext {
         } else {
             let result = Box<?T>(None)
             let message = Box<?String>(None)
-            let counter = SyncCounter(1)
+            let counter = AtomicInt64(1)
             postJSTask {
                 try {
                     result.value = createScopes(task)
                 } catch (e: Exception) {
                     message.value = e.message
-                    counter.dec()
+                    counter.store(0)
                     throw e
                 } catch (e: Error) {
                     message.value = e.message
-                    counter.dec()
+                    counter.store(0)
                     throw e
                 }
-                counter.dec()
+                counter.store(0)
             }
-            counter.waitUntilZero()
+            while (counter.load() != 0) {
+            }
             match (message.value) {
                 case Some(v) => throw Exception(v)
                 case None => return result.value.getOrThrow()
