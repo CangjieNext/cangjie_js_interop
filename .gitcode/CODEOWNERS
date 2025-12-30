@@ -1,0 +1,8 @@
+/.gitcode/ @xuanjz
+*.md @luojianing
+OAT.xml @xuanjz
+
+/build/ @xuanjz
+/docs/ @xuanjz
+/src/ @xuanjz
+/tests/ @xuanjz
