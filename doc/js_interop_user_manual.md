@@ -23,11 +23,11 @@
 
 1. 创建仓颉工程。
 
-   ![](./图片/创建工程.png)
+   ![](../figures/js_interop_create_project.png)
 
 2. 将互操作库代码复制到工程的顶层目录下。
 
-   ![](./图片/工程目录.png)
+   ![](../figures/js_interop_project_structure.png)
 
 3. 在 **src->main->cangjie->cjpm.toml** 文件中添加依赖。
 
@@ -39,18 +39,18 @@
    ...
    ```
 
-   ![](./图片/添加依赖.png)
+   ![](../figures/js_interop_add_dependency.png)
 
 4. 在 **src->main->cangjie** 下新建仓颉文件，以 **test.cj** 为例。
 
-   ![](./图片/新建仓颉文件.png)
+   ![](../figures/js_interop_create_cangjie_file.png)
 
 5. 在 **test.cj** 文件中添加互操作代码，以如下代码为例，其中第 13~15 行即为被调用的 JS 代码。
 
    ```cangjie
    package ohos_app_cangjie_entry
 
-   import tpc.js_interop.*
+   import js_interop.*
 
    func test() {
        // 创建JS运行时
@@ -82,21 +82,21 @@
    ...
    ```
 
-   ![](./图片/使用函数.png)
+   ![](../figures/js_interop_usage_function.png)
 
 7. 编译运行后，点击按钮，会显示在 JS 侧计算的结果。
 
-   ![](./图片/显示结果.jpeg)
+   ![](../figures/js_interop_show_result.jpeg)
 
 ### 仓颉调用 JavaScript 后回调仓颉
 
 1. 创建仓颉工程。
 
-   ![](./图片/创建工程.png)
+   ![](../figures/js_interop_create_project.png)
 
 2. 将互操作库代码复制到工程的顶层目录下。
 
-   ![](./图片/工程目录.png)
+   ![](../figures/js_interop_project_structure.png)
 
 3. 在 **src->main->cangjie->cjpm.toml** 文件中添加依赖。
 
@@ -108,18 +108,18 @@
    ...
    ```
 
-   ![](./图片/添加依赖.png)
+   ![](../figures/js_interop_add_dependency.png)
 
 4. 在 **src->main->cangjie** 下新建仓颉文件，以 **test.cj** 为例。
 
-   ![](./图片/新建仓颉文件.png)
+   ![](../figures/js_interop_create_cangjie_file.png)
 
 5. 在 **test.cj** 文件中添加互操作代码，以如下代码为例，其中第 14 行即为被调用的仓颉代码。
 
    ```cangjie
    package ohos_app_cangjie_entry
 
-   import tpc.js_interop.*
+   import js_interop.*
 
    // 定义被调用接口
    func addNumber(context: JSContext, callInfo: JSCallInfo): JSValue {
@@ -160,11 +160,11 @@
    ...
    ```
 
-   ![](./图片/使用函数.png)
+   ![](../figures/js_interop_usage_function.png)
 
 7. 编译运行后，点击按钮，会显示在 JS 侧计算的结果。
 
-   ![](./图片/显示结果.jpeg)
+   ![](../figures/js_interop_show_result.jpeg)
 
 # 规格介绍
 
