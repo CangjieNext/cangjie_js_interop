@@ -15,7 +15,13 @@ struct AtomicLock {
 
     mut func acquire<T>(lambda: () -> T): T {
         while (value.compareAndSwap(0, 1) == false) {}
-        let result = lambda()
+        let result = try {
+            lambda()
+        } catch (e: Exception) {
+            value.store(0)
+            JSLOG.error("acquire lock failed:${e.message}")
+            throw e
+        }
         value.store(0)
         return result
     }

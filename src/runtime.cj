@@ -50,7 +50,7 @@ public class JSRuntime {
     private static let JSVMGlobalInitTask = Once {
         var options = JSVM_InitOptions()
         unsafe {
-            check(OH_JSVM_Init(inout options))
+            checkForInit(OH_JSVM_Init(inout options))
         }
     }
 
@@ -83,53 +83,19 @@ public class JSRuntime {
     }
 
     ~init() {
+        JSLOG.info("begin destroy in destructor.")
         if (!destroyed.compareAndSwap(false, true)) {
             return
         }
-
-        let counter = AtomicInt64(1)
-        uvLoop_.postTask {
-            unsafe {
-                if (let Some(context) <- mainContext_) {
-                    check(OH_JSVM_DestroyEnv(context.env))
-                }
-                check(OH_JSVM_CloseVMScope(vm_, scope_))
-                check(OH_JSVM_DestroyVM(vm_))
-            }
-            if (let Some(context) <- mainContext_) {
-                context.destroyed = true
-            }
-            counter.store(0)
-        }
-        while (counter.load() != 0) {
-        }
-
-        uvLoop_.stop()
+        uvLoop_.destroy(mainContext_, vm_, scope_)
     }
 
     public func destroy(): Unit {
+        JSLOG.info("begin destroy.")
         if (!destroyed.compareAndSwap(false, true)) {
             return
         }
-
-        let counter = AtomicInt64(1)
-        uvLoop_.postTask {
-            unsafe {
-                if (let Some(context) <- mainContext_) {
-                    check(OH_JSVM_DestroyEnv(context.env))
-                }
-                check(OH_JSVM_CloseVMScope(vm_, scope_))
-                check(OH_JSVM_DestroyVM(vm_))
-            }
-
-            if (let Some(context) <- mainContext_) {
-                context.destroyed = true
-            }
-            counter.store(0)
-        }
-        while (counter.load() != 0) {
-        }
-        uvLoop_.stop()
+        uvLoop_.destroy(mainContext_, vm_, scope_)
     }
 
     public func isDestroyed(): Bool {
@@ -138,6 +104,16 @@ public class JSRuntime {
 
     // This will be replaced by `checkAndHandleError`.
     static func check(status: JSVM_Status): Unit {
+        if (!status.isOk()) {
+            throw Exception(status.toString())
+        }
+    }
+
+    // 过滤重复初始化的错误码
+    static func checkForInit(status: JSVM_Status): Unit {
+        if (status == JSVM_Status.GENERIC_FAILURE) {
+            return
+        }
         if (!status.isOk()) {
             throw Exception(status.toString())
         }
