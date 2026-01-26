@@ -145,10 +145,10 @@ let JSVM_StatusNames = [
     ]
 
 @C
-struct JSVM_Status {
-    JSVM_Status(let value: UInt64) {}
+public struct JSVM_Status {
+    JSVM_Status(let value: UInt32) {}
 
-    init() {
+    public init() {
         this(0)
     }
 
@@ -179,7 +179,11 @@ struct JSVM_Status {
     public static let INVALID_TYPE = JSVM_Status(24)
 
     public func toString(): String {
-        return "[JSVM_Status: ${value}]: ${JSVM_StatusNames[Int64(value)]}"
+        if (JSVM_StatusNames.size > Int64(value)) {
+            return "[JSVM_Status: ${value}]: ${JSVM_StatusNames[Int64(value)]}"
+        } else {
+            return "[JSVM_Status: ${value}]"
+        }
     }
 
     public operator func ==(target: JSVM_Status): Bool {
@@ -305,7 +309,7 @@ public struct JSVM_HeapStatistics {
 }
 
 @C
-struct JSVM_InitOptions {
+public struct JSVM_InitOptions {
     JSVM_InitOptions(
         let externalReferences: CPointer<IntNative>,
         let argc: CPointer<Int32>,
@@ -313,7 +317,7 @@ struct JSVM_InitOptions {
         let removeFlags: Bool
     ) {}
 
-    init() {
+    public init() {
         this(CPointer<IntNative>(), CPointer<Int32>(), CPointer<CString>(), false)
     }
 }
@@ -522,12 +526,16 @@ foreign {
     func OH_JSVM_DestroyVM(vm: JSVM_VM): JSVM_Status
     func OH_JSVM_OpenVMScope(vm: JSVM_VM, result: CPointer<JSVM_VMScope>): JSVM_Status
     func OH_JSVM_CloseVMScope(vm: JSVM_VM, scope: JSVM_VMScope): JSVM_Status
+    func OH_JSVM_SetDebugOption(env: JSVM_Env, opt: JSVM_DebugOption, isEnabled: Bool): JSVM_Status
     func OH_JSVM_CreateEnv(vm: JSVM_VM, propertyCount: Int64, properties: CPointer<JSVM_PropertyDescriptor>, result: CPointer<JSVM_Env>): JSVM_Status
     func OH_JSVM_DestroyEnv(vm: JSVM_Env): JSVM_Status
     func OH_JSVM_OpenEnvScope(env: JSVM_Env, result: CPointer<JSVM_EnvScope>): JSVM_Status
     func OH_JSVM_CloseEnvScope(env: JSVM_Env, scope: JSVM_EnvScope): JSVM_Status
     func OH_JSVM_OpenHandleScope(env: JSVM_Env, result: CPointer<JSVM_HandleScope>): JSVM_Status
+    func OH_JSVM_OpenEscapableHandleScope(env: JSVM_Env, result: CPointer<JSVM_EscapableHandleScope>): JSVM_Status
     func OH_JSVM_CloseHandleScope(env: JSVM_Env, scope: JSVM_HandleScope): JSVM_Status
+    func OH_JSVM_CloseEscapableHandleScope(env: JSVM_Env, scope: JSVM_EscapableHandleScope): JSVM_Status
+    func OH_JSVM_EscapeHandle(env: JSVM_Env, scope: JSVM_EscapableHandleScope, escapee: JSVM_Value, result: CPointer<JSVM_Value>): JSVM_Status
     // Handle exceptions.
     func OH_JSVM_ThrowError(env: JSVM_Env, code: CString, msg: CString): JSVM_Status
     func OH_JSVM_GetAndClearLastException(env: JSVM_Env, result: CPointer<JSVM_Value>): JSVM_Status
@@ -612,4 +620,15 @@ foreign {
     // Manage memory.
     func OH_JSVM_MemoryPressureNotification(env: JSVM_Env, level: JSVM_MemoryPressureLevel): JSVM_Status
     func OH_JSVM_GetHeapStatistics(vm: JSVM_VM, result: CPointer<JSVM_HeapStatistics>): JSVM_Status
+}
+
+@C
+public struct JSVM_DebugOption {
+    JSVM_DebugOption(let value: UInt32) {}
+
+    public init() {
+        this(0)
+    }
+
+    public static let JSVM_SCOPE_CHECK = JSVM_DebugOption(0)
 }

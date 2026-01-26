@@ -68,8 +68,13 @@ func throwExceptionToJS(env: JSVM_Env, info: String, stack: Array<StackTraceElem
 
 @C
 func jsFunctionCallbackStub(env: JSVM_Env, info: JSVM_CallbackInfo): JSVM_Value {
-    let context = JSContext.getContext(env)
-    context.newScope {
+    let optionContext = JSContext.getContext(env)
+    if (optionContext.isNone()) {
+        JSLOG.error("context is None.")
+        return JSVM_Value()
+    }
+    let context = optionContext.getOrThrow()
+    context.newEscapeScope {
         let cbInfo = JSCallInfo.parseCallInfo(context, info)
         try {
             let fun = context.sharedLambda_.get(cbInfo.lambdaId).getOrThrow()
@@ -87,7 +92,12 @@ func jsFunctionCallbackStub(env: JSVM_Env, info: JSVM_CallbackInfo): JSVM_Value 
 
 @C
 func jsFunctionFinalizerStub(env: JSVM_Env, data: CPointer<Unit>, hint: Int64): Unit {
-    let context = JSContext.getContext(env)
+    let optionContext = JSContext.getContext(env)
+    if (optionContext.isNone()) {
+        JSLOG.error("context is None.")
+        return
+    }
+    let context = optionContext.getOrThrow()
     if (let Some(f) <- context.sharedLambda_.remove(hint)) {
         unsafe {
             LibC.free(data)

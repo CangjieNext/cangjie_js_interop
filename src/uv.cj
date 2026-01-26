@@ -8,6 +8,7 @@ package js_interop
 
 import std.sync.AtomicInt32
 import std.sync.AtomicBool
+import std.sync.AtomicInt64
 
 type uv_thread_t = UIntNative
 
@@ -43,6 +44,7 @@ foreign {
     func uv_close(async: uv_async, callback: CFunc<(uv_async) -> Unit>): Unit
     func uv_walk(loop: uv_loop, callback: CFunc<(uv_async, CPointer<Unit>) -> Unit>, data: CPointer<Unit>): Unit
     func uv_is_closing(async: uv_async): Int32
+    func uv_loop_close(loop: uv_loop): Int32
 }
 
 @C
@@ -84,7 +86,7 @@ class UvLoop {
     }
 
     private let loop_: uv_loop
-    private var tid_: uv_thread_t
+    public var tid_: uv_thread_t
     private let async_: uv_async
 
     // 0: Starting
@@ -123,25 +125,13 @@ class UvLoop {
         if (tid_ == currentTid) {
             throw Exception("can't stop uv loop on it's running thread")
         }
-
-        postTask {
-            unsafe {
-                uv_walk(loop_, {
-                    handler, arg => if (uv_is_closing(handler) == 0) {
-                        uv_close(handler) {
-                            handler => ()
-                        }
-                    }
-                }, CPointer<Unit>())
-                destroyed.store(true)
-            }
-        }
-
+        closeHandles()
+        allLoops_.remove(getIndex())
         unsafe {
+            uv_stop(loop_)
             uv_close(async_) {
                 item => ()
             }
-            uv_stop(loop_)
             var tid = tid_
             uv_thread_join(inout tid)
         }
@@ -154,11 +144,23 @@ class UvLoop {
         }
     }
 
+    func getIndex(): Int64 {
+        let id = unsafe {
+            Int64(CPointer<UIntNative>(async_).read())
+        }
+        id
+    }
+
     public func postTask(task: () -> Unit): Unit {
         pendingTasks_.append(task)
+        var index = 3
         if (asyncStatus_.compareAndSwap(0, 1)) {
-            let status = unsafe {
+            var status = unsafe {
                 uv_async_send(async_)
+            }
+            while (status != 0 && index > 0) {
+                status = unsafe {uv_async_send(async_)}
+                index = index - 1
             }
             if (status != 0) {
                 asyncStatus_.store(0)
@@ -173,6 +175,7 @@ class UvLoop {
                 runStatus_.store(1)
             }
             uv_run(loop_, uv_run_mode.DEFAULT)
+            uv_loop_close(loop_)
         }
     }
 
@@ -194,5 +197,48 @@ class UvLoop {
 
     public func isOnRunningThread(): Bool {
         return tid_ == currentTid
+    }
+
+    public func destroy(mainContext_: ?JSContext, vm_: JSVM_VM, scope_: JSVM_VMScope): Unit {
+        let counter = AtomicInt64(1)
+        postTask {
+            unsafe {
+                if (let Some(context) <- mainContext_) {
+                    let res = context.removeCtx()
+                    if (res.isNone()) {
+                        JSLOG.error("removeCtx failed.")
+                    }
+                    JSRuntime.check(OH_JSVM_CloseEnvScope(context.env, context.envScope))
+//                    JSRuntime.check(OH_JSVM_SetDebugOption(context.env, JSVM_DebugOption.JSVM_SCOPE_CHECK, false))
+                    JSRuntime.check(OH_JSVM_DestroyEnv(context.env))
+                    context.destroyed.store(true)
+                }
+                JSRuntime.check(OH_JSVM_CloseVMScope(vm_, scope_))
+                JSRuntime.check(OH_JSVM_DestroyVM(vm_))
+            }
+            counter.store(0)
+        }
+        while (counter.load() != 0) {
+        }
+        stop()
+    }
+
+    private func closeHandles(): Unit {
+        let counter = AtomicInt64(1)
+        postTask {
+            unsafe {
+                uv_walk(loop_, {
+                    handler, arg => if (uv_is_closing(handler) == 0) {
+                        uv_close(handler) {
+                            handler => ()
+                        }
+                    }
+                }, CPointer<Unit>())
+            }
+            counter.store(0)
+            destroyed.store(true);
+        }
+        while (counter.load() != 0) {
+        }
     }
 }
