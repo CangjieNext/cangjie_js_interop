@@ -8,25 +8,39 @@ package js_interop
 
 import std.collection.*
 import std.sync.AtomicInt64
+import std.sync.AtomicBool
 
 
 public class JSContext {
     private static let allContext_ = HashMap<UIntNative, JSContext>()
     private static var mutex_ = AtomicLock()
-    var destroyed = false
+    var destroyed = AtomicBool(false)
+    let envScope: JSVM_EnvScope
 
     JSContext(
         private let env_: JSVM_Env,
         private let loop_: UvLoop
     ) {
         // startAsync()
+        var envScopeTemp = JSVM_EnvScope()
+        JSRuntime.check(unsafe {OH_JSVM_OpenEnvScope(env_, inout envScopeTemp)})
+        envScope = envScopeTemp
+    }
+
+    prop currentTid: uv_thread_t {
+        get() {
+            unsafe { uv_thread_self() }
+        }
     }
 
     prop env: JSVM_Env {
         get() {
             // checkScope()
-            if (destroyed) {
-                throw Exception("Contex has been destroyed!")
+            if (loop_.tid_ != currentTid) {
+                throw Exception("Should be run in the libuv thread.")
+            }
+            if (destroyed.load()) {
+                throw Exception("Context has been destroyed!")
             }
             env_
         }
@@ -35,21 +49,21 @@ public class JSContext {
     static func createContext(env: JSVM_Env, loop: UvLoop): JSContext {
         let key = env.toUIntNative()
         mutex_.acquire {
-            if (let Some(ctx) <- allContext_.get(key)) {
-                return ctx
-            } else {
-                let ctx = JSContext(env, loop)
-                allContext_.add(key, ctx)
-                return ctx
-            }
+            let ctx = JSContext(env, loop)
+            allContext_.add(key, ctx)
+            return ctx
         }
     }
 
-    static func getContext(env: JSVM_Env): JSContext {
+    static func getContext(env: JSVM_Env): ?JSContext {
         let key = env.toUIntNative()
         mutex_.acquire {
-            allContext_[key]
+            allContext_.get(key)
         }
+    }
+
+    func removeCtx(): ?JSContext {
+        return JSContext.removeContext(env_)
     }
 
     static func removeContext(env: JSVM_Env): ?JSContext {
@@ -61,20 +75,20 @@ public class JSContext {
 
     var sharedLambda_ = Slab<JSLambda>()
     var asyncCallbacks_ = SlabMT<() -> Unit>()
-    let toDeleteRefs_ = ArrayList<JSVM_Ref>()
+    var toDeleteRefs_ = ArrayList<JSVM_Ref>()
     var refsMutex_ = AtomicLock()
 
     func doAsyncTask(): Unit {
         let callbacks = asyncCallbacks_.getAllAndClear()
         for (callback in callbacks) {
-            if (this.destroyed) {
+            if (this.destroyed.load()) {
                 return
             }
             callback()
         }
         let refs = refsMutex_.acquire {
             let result = toDeleteRefs_.toArray()
-            toDeleteRefs_.clear()
+            toDeleteRefs_ = ArrayList<JSVM_Ref>()
             result
         }
         newScope { JSHeapObject.releaseRefs(env, refs) }
@@ -108,27 +122,22 @@ public class JSContext {
     var scopeDepth_ = 0
     private func createScopes<T>(task: () -> T): T {
         unsafe {
-            var envScope = JSVM_EnvScope()
             var handleScope = JSVM_HandleScope()
             scopeDepth_++
-            JSRuntime.check(OH_JSVM_OpenEnvScope(env, inout envScope))
             JSRuntime.check(OH_JSVM_OpenHandleScope(env, inout handleScope))
             var result: ?T = None
             try {
                 result = task()
             } catch (e: Exception) {
                 JSRuntime.check(OH_JSVM_CloseHandleScope(env, handleScope))
-                JSRuntime.check(OH_JSVM_CloseEnvScope(env, envScope))
                 scopeDepth_--
                 throw e
             } catch (e: Error) {
                 JSRuntime.check(OH_JSVM_CloseHandleScope(env, handleScope))
-                JSRuntime.check(OH_JSVM_CloseEnvScope(env, envScope))
                 scopeDepth_--
                 throw e
             }
             JSRuntime.check(OH_JSVM_CloseHandleScope(env, handleScope))
-            JSRuntime.check(OH_JSVM_CloseEnvScope(env, envScope))
             scopeDepth_--
             return result.getOrThrow()
         }
@@ -137,6 +146,28 @@ public class JSContext {
     func checkScope(): Unit {
         if (scopeDepth_ <= 0) {
             throw Exception("Create a scope first!")
+        }
+    }
+
+    func createEscapeScopes(task: () -> JSVM_Value): JSVM_Value {
+        unsafe {
+            var escapeHandleScope = JSVM_EscapableHandleScope()
+            JSRuntime.check(OH_JSVM_OpenEscapableHandleScope(env, inout escapeHandleScope))
+            var result: ?JSVM_Value = None
+            try {
+                var val = JSVM_Value()
+                let res = task()
+                JSRuntime.check(OH_JSVM_EscapeHandle(env, escapeHandleScope, res, inout val))
+                result = val
+            } catch (e: Exception) {
+                JSRuntime.check(OH_JSVM_CloseEscapableHandleScope(env, escapeHandleScope))
+                throw e
+            } catch (e: Error) {
+                JSRuntime.check(OH_JSVM_CloseEscapableHandleScope(env, escapeHandleScope))
+                throw e
+            }
+            JSRuntime.check(OH_JSVM_CloseEscapableHandleScope(env, escapeHandleScope))
+            return result.getOrThrow()
         }
     }
 
@@ -150,6 +181,36 @@ public class JSContext {
             postJSTask {
                 try {
                     result.value = createScopes(task)
+                } catch (e: Exception) {
+                    message.value = e.message
+                    counter.store(0)
+                    throw e
+                } catch (e: Error) {
+                    message.value = e.message
+                    counter.store(0)
+                    throw e
+                }
+                counter.store(0)
+            }
+            while (counter.load() != 0) {
+            }
+            match (message.value) {
+                case Some(v) => throw Exception(v)
+                case None => return result.value.getOrThrow()
+            }
+        }
+    }
+
+    func newEscapeScope(task: () -> JSVM_Value): JSVM_Value {
+        if (loop_.isOnRunningThread()) {
+            return createEscapeScopes(task)
+        } else {
+            let result = Box<?JSVM_Value>(None)
+            let message = Box<?String>(None)
+            let counter = AtomicInt64(1)
+            postJSTask {
+                try {
+                    result.value = createEscapeScopes(task)
                 } catch (e: Exception) {
                     message.value = e.message
                     counter.store(0)
