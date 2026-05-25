@@ -1,7 +1,8 @@
-# Cangjie-JavaScript Interoperability
+# Cangjie-JavaScript Interop Library
+
 ## Introduction
 
-Cangjie-JavaScript interoperability is used to provide cross-language interoperability capabilities between Cangjie and JavaScript, namely Cangjie interoperability library interfaces. It aims to provide developers with cross-language interoperability solutions that balance development efficiency and runtime efficiency, offer a concise interoperability development paradigm, and reduce cross-language communication overhead. At the same time, this repository also provides public documentation, including Cangjie API reference and user manual. Currently, the interfaces open in this repository only support OpenHarmony scenario.
+Cangjie-JavaScript Interop Library is used to provide cross-language capabilities for Cangjie to call JavaScript, namely interfaces for Cangjie to call JavaScript libraries. It aims to provide developers with cross-language solutions that balance development efficiency and runtime efficiency, offer a concise development paradigm, and reduce cross-language communication overhead. At the same time, this repository also provides public documentation, including API reference and user manual. Currently, the interfaces open in this repository only support OpenHarmony scenario.
 
 ## System Architecture
 
@@ -55,12 +56,47 @@ For interoperability related APIs, please see [API Documentation](https://gitcod
 
 ## Constraints
 
-None.
+Currently only supports compilation and usage on Linux platform, and only supports the cjnative backend of Cangjie compiler.
 
-## Code Contribution
+## Build
 
-Developers are welcome to contribute code, documentation, etc. For specific contribution processes and methods, please refer to [Code Contribution](https://gitcode.com/openharmony/docs/blob/master/en/contribute/code-contribution.md).
+### Build Preparation
+
+Developers need the Linux platform `cangjie SDK`, then execute the corresponding `SDK`'s `envsetup` script to ensure the `SDK` is properly configured.
+
+### Build Steps
+
+1. Clone the project.
+
+2. Build the Cangjie-JavaScript interop library using `cjpm.toml` in the root directory:
+
+    ```shell
+    cjpm build --release
+    ```
+
+    Currently supports `debug` and `release` two build types, developers need to specify via `--release` or `--debug`.
+
+    The compiled output is installed to the `target` directory by default, developers can specify installation directory through `--target-dir` parameter.
+
+    The current compiled output directory structure is:
+
+    ```text
+    target/
+    └── release
+        └── js_interop
+            ├── incremental-cache.json
+            ├── js_interop.cjo
+            └── libjs_interop.so
+    ```
 
 ## Related Repositories
 
 [arkcompiler_jsvm](https://gitcode.com/openharmony/arkcompiler_jsvm)
+
+## Open Source License
+
+This project is based on [Apache-2.0 with Runtime Library Exception](./LICENSE) and [Attribution 4.0 International](./doc/LICENSE), please feel free to enjoy and participate in open source.
+
+## Code Contribution
+
+Developers are welcome to contribute code, documentation, etc. For specific contribution processes and methods, please refer to [Contribution](https://gitcode.com/Cangjie/CangjieCommunity/blob/main/contribute/contribution.md).

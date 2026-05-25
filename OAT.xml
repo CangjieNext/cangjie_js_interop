@@ -7,6 +7,8 @@
             <policy name="projectPolicy" desc="">
                 <policyitem type="copyright" name="Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
                 <policyitem type="copyright" name="REM Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
+                <policyitem type="copyright" name="Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
+                <policyitem type="copyright" name="REM Copyright (c) Huawei Technologies Co., Ltd. 2026. All rights reserved." path=".*" rule="may" group="defaultGroup" filefilter="copyrightPolicyFilter" desc=""/>
                 <policyitem type="license" name="CC-BY-4.0" path=".*" rule="may" group="defaultGroup" filefilter="defaultPolicyFilter" desc=""/>
             </policy>
         </policylist>
@@ -14,7 +16,7 @@
             <filefilter name="defaultFilter" desc="Files not to check">
                 <filteritem type="filename" name="COPYRIGHT|COPYRIGHT_EN" desc="doc file"/>
                 <filteritem type="filename" name="*.diff" desc="diff file"/>
-                <filteritem type="filename" name="*.cj|*.dylib|*.obfmap|*.expect|*.tsv|*.csv|*.der|*.text|*.key|*.zoneinfo.tar.g|errorTimeZone|*.expect|*.csr|*.der|Shanghai|*.info|*.dll|*.so|*.out|*.gz|TyKind.inc|*.base|*.test|*.list" desc="desc files"/>
+                <filteritem type="filename" name="*.dylib|*.obfmap|*.expect|*.tsv|*.csv|*.der|*.text|*.key|*.zoneinfo.tar.g|errorTimeZone|*.expect|*.csr|*.der|Shanghai|*.info|*.dll|*.so|*.out|*.gz|TyKind.inc|*.base|*.test|*.list" desc="desc files"/>
             </filefilter>
             <filefilter name="licenseFileNamePolicyFilter" desc="Filters for LICENSE file policies">
 

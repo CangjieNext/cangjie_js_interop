@@ -18,8 +18,8 @@
   link-option = ""
   name = "js_interop"
   output-type = "dynamic"
-  src-dir = "."
-  target-dir = "../target"
+  src-dir = "./src"
+  target-dir = "./target"
   version = "1.0.0"
 
 [profile]
