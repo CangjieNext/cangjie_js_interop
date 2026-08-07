@@ -13,11 +13,11 @@ The overall architecture is shown in the following diagram:
 Interface Layer:
 
 - Interoperability Library (ark_interop): Developers can achieve cross-language parameter passing, function calls, and other capabilities by calling the APIs provided by the interoperability library.
-    - JSRuntime: Used to represent an JavaScript runtime instance. Each JavaScript runtime corresponds to one JSRuntime instance, which provides methods to create JSRuntime and obtain the execution context JSContext associated with that JSRuntime;
+    - JSRuntime: Used to represent a JavaScript runtime instance. Each JavaScript runtime corresponds to one JSRuntime instance, which provides methods to create JSRuntime and obtain the execution context JSContext associated with that JSRuntime;
     - JSContext: Used to represent the execution context associated with a JSRuntime. This execution context saves global objects and provides methods for module loading, JSValue access, etc.;
     - JSCallInfo: Used to represent call information when JavaScript calls Cangjie methods, mainly used to obtain the number of parameters and parameter list;
     - JSCodeCache：Used to represent the cache of a piece of JavaScript code, mainly used to speed up the next compilation.
-    - JSValue: Used to represent an JavaScript object. In Cangjie-JavaScript interoperability, it is used to encapsulate and pass JavaScript data objects. When you need to get values from JSValue on the Cangjie side, you need to use the methods provided in JSValue to convert them to specific type instances, such as JSNumber, JSString, JSBoolean, etc.; conversely, when you need to pass data from Cangjie side to JavaScript, you can use the methods provided by JSContext to encapsulate a Cangjie object into a JSValue instance;
+    - JSValue: Used to represent a JavaScript object. In Cangjie-JavaScript interoperability, it is used to encapsulate and pass JavaScript data objects. When you need to get values from JSValue on the Cangjie side, you need to use the methods provided in JSValue to convert them to specific type instances, such as JSNumber, JSString, JSBoolean, etc.; conversely, when you need to pass data from Cangjie side to JavaScript, you can use the methods provided by JSContext to encapsulate a Cangjie object into a JSValue instance;
 
 Framework Layer:
 
@@ -48,7 +48,7 @@ In OpenHarmony application development, there is a demand for hybrid development
 
 For detailed examples, please refer to: [Using JavaScript Modules in Cangjie Applications](https://gitcode.com/openharmony-sig/arkcompiler_cangjie_ark_interop/blob/master/doc/cj-user-manual/source_en/FFI/cangjie-arkts/using_arkts_module.md)
 
-- Scenario 2: When developing with JavaScript, calling code modules developed in Cangjie through cross-language interoperability to leverage Cangjie's high performance and high concurrency advantages, improving application performance experience; (Only support calling back Cangjie after Cangjie calling JavaScript for now)
+- Scenario 2: When developing with JavaScript, calling code modules developed in Cangjie through cross-language interoperability to leverage Cangjie's high performance and high concurrency advantages, improving application performance experience; (Only supports calling back Cangjie after Cangjie calls  JavaScript for now)
 
 For detailed examples, please refer to: [JavaScript Calling Cangjie](https://gitcode.com/Cangjie/cangjie_js_interop/blob/dev/doc/%E4%BB%93%E9%A2%89%E4%B8%8E%20JavaScript%20%E4%BA%92%E6%93%8D%E4%BD%9C%E5%BA%93%E7%94%A8%E6%88%B7%E6%89%8B%E5%86%8C.md#%E4%BB%93%E9%A2%89%E8%B0%83%E7%94%A8-javascript-%E5%90%8E%E5%9B%9E%E8%B0%83%E4%BB%93%E9%A2%89)
 
